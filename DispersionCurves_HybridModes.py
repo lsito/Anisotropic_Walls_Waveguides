@@ -133,7 +133,6 @@ for mode in modes:
     ax.legend()
     
 plt.show()
-
 #%% Fields computation
 # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
 
@@ -179,7 +178,6 @@ def compute_fields(a, b, zz, zt, m, n, freq, flag=True):
         # Supporting pieces
         Ap = (Gammam*np.exp(1j*kx*x, dtype = complex)+Gammap*np.exp(-1j*kx*x, dtype = complex))
         Bp = (Psim*np.exp(1j*kx*x, dtype = complex)+Psip*np.exp(-1j*kx*x, dtype = complex))
-    
         Am = (Gammam*np.exp(1j*kx*x, dtype = complex)-Gammap*np.exp(-1j*kx*x, dtype = complex))
         Bm = (Psim*np.exp(1j*kx*x, dtype = complex)-Psip*np.exp(-1j*kx*x, dtype = complex))
     
@@ -279,7 +277,7 @@ plt.show()
 
 # The analytical dispersion equation for a rectangular waveguide
 
-def compute_fields_aTE(a, b, m, n, freq, flag="TE"):
+def compute_fields_a(a, b, m, n, freq, flag):
 
     ky= m*np.pi/b
     kx= n*np.pi/a
@@ -290,22 +288,31 @@ def compute_fields_aTE(a, b, m, n, freq, flag="TE"):
     gamma_ = np.sqrt(k0**2 - kc**2, dtype=complex)
     Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
     
-    labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
-    
-    if flag=="TE":
-        def compute_fieldsTE(x,y):
-            
-            Hz = np.cos(kx*x)*np.cos(ky*y)
-            Ez = 0*x*y
-            
-            Hx = 1j*gamma_*kx/kc**2*np.sin(kx*x)*np.cos(ky*y)
-            Hy = 1j*gamma_*ky/kc**2*np.cos(kx*x)*np.sin(ky*y)
-            
-            Ex = k0/gamma_*Z0*Hy
-            Ey = -k0/gamma_*Z0*Hx
+    def compute_fieldsTE(x,y):
         
-            return [Ex, Ey, Ez, Hx, Hy, Hz]
-    
+        HzTE = np.cos(kx*x)*np.cos(ky*y)
+        EzTE = 0*x*y
+        
+        HxTE = 1j*gamma_*kx/kc**2*np.sin(kx*x)*np.cos(ky*y)
+        HyTE = 1j*gamma_*ky/kc**2*np.cos(kx*x)*np.sin(ky*y)
+        
+        ExTE = k0/gamma_*Z0*HyTE
+        EyTE = -k0/gamma_*Z0*HxTE
+        
+        return [ExTE, EyTE, EzTE, HxTE, HyTE, HzTE]
+        
+    def compute_fieldsTM(x,y):
+        
+        HzTM = 0*x*y
+        EzTM = np.sin(kx*x)*np.sin(ky*y)
+        
+        ExTM = 1j*gamma_*kx/kc**2*np.cos(kx*x)*np.sin(ky*y)
+        EyTM = 1j*gamma_*ky/kc**2*np.sin(kx*x)*np.cos(ky*y)
+        
+        HxTM = -EyTM*k0/gamma_/Z0
+        HyTM = ExTM*k0/gamma_/Z0
+        
+        return [ExTM, EyTM, EzTM, HxTM, HyTM, HzTM]
     
     # Generate a grid of x and y values
     x_values = np.linspace(0, a, 100)  # 100 points between 0 and a
@@ -315,9 +322,12 @@ def compute_fields_aTE(a, b, m, n, freq, flag="TE"):
     x_mesh, y_mesh = np.meshgrid(x_values, y_values)
     
     # Evaluate the function for each combination of x and y
-    fields = compute_fieldsTE(x_mesh, y_mesh)
+    if flag=="TE":
+        fields = compute_fieldsTE(x_mesh, y_mesh)
+    else:
+        fields = compute_fieldsTM(x_mesh, y_mesh)
+    
     mesh = [x_values, y_values]
-
     return [fields, mesh]
 
 # Create a subplot with contourf
@@ -325,16 +335,47 @@ fig, ax = plt.subplots(2,3, figsize=(10, 5))
 
 labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
 
-freq = 10e9
 m = 1
 n = 1
-A = compute_fields_aTE(a=a, b=b, m=m, n=n, freq=10e9)
+A = compute_fields_a(a=a, b=b, m=m, n=n, freq=20e9, flag="TM")
 
 for idx, el in enumerate(labels):
     row = idx // 3  # Determine the row (0 or 1)
     col = idx % 3   # Determine the column (0, 1, or 2)
 
     contour = ax[row, col].contourf(A[1][0], A[1][1], np.abs(A[0][idx]), cmap='viridis', levels=100)
+    fig.colorbar(contour, ax=ax[row, col])
+
+    # Add labels and title
+    ax[row, col].set_xlabel('x [m]')
+    ax[row, col].set_ylabel('y [m]')
+    ax[row, col].set_title(el)
+
+    ax[row, col].set_aspect('equal')
+
+# Set a title for the whole figure
+fig.suptitle(f'TE{n}{m} analytical, WR90', fontsize=16)
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+# Benchmark
+fig, ax = plt.subplots(2,3, figsize=(10, 5))
+
+labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
+
+m = 1
+n = 1
+TEanalytical = compute_fields_a(a=a, b=b, m=m, n=n, freq=20e9, flag="TE")
+TManalytical = compute_fields_a(a=a, b=b, m=m, n=n, freq=20e9, flag="TM")
+A = compute_fields(a=a, b=b, zz=0, zt=0, m=m, n=n, freq=20e9)
+
+for idx, el in enumerate(labels):
+    row = idx // 3  # Determine the row (0 or 1)
+    col = idx % 3   # Determine the column (0, 1, or 2)
+
+    contour = ax[row, col].contourf(A[1][0], A[1][1], np.abs(np.imag(A[0][idx])/np.imag(np.imag(A[0][idx]))-np.imag(TManalytical[0][idx])/np.amax(np.imag(TManalytical[0][idx]))-np.imag(TEanalytical[0][idx])/np.amax(np.imag(TEanalytical[0][idx]))), cmap='viridis', levels=100)
     fig.colorbar(contour, ax=ax[row, col])
 
     # Add labels and title
