@@ -53,7 +53,7 @@ def f_of_kc_mne0(kc, m, freq):
         K0xc = k0*kx/kc**2
         Kzyc = gamma*ky/kc**2
 
-        if np.abs(zt)*np.abs(zz)==0: # The metal waveguide condition
+        if np.abs(zt)+np.abs(zz)==0: # The metal waveguide condition
             f = np.abs(1-X)
         else:
             f = np.abs(
@@ -78,37 +78,38 @@ def compute_kc(a, b, zz, zt, m, n, freq):
         roots = x[roots_idx]
         kc_ = roots[n-1] # Because there is no TEM
     else:
-        x = np.linspace(1, 600, 20000) # Hard coded, not nice!
+        x = np.linspace(1, 600, 10000) # Hard coded, not nice!
         roots_idx = find_peaks(-f_of_kc_mne0(x, m, freq))[0]
         
         roots = x[roots_idx]
         kc_ = roots[n]
     
     k0_ = 2*np.pi*freq*np.sqrt(sc.epsilon_0*sc.mu_0)
+    # gamma_ = np.sqrt(kc_**2 - k0_**2, dtype=complex)
     gamma_ = np.sqrt(kc_**2 - k0_**2, dtype=complex)
     eps_eff_ = (np.imag(gamma_)/k0_)**2
 
     return k0_, kc_, gamma_, eps_eff_
 
   
-#%% Test Dispersion curves with analytical eq.
+#%% Test Dispersion curves with analytical eq from TE
 
 fig, ax = plt.subplots()
 
-modes = [[1,0], [2,0], [1,1]]
+modes = [[1,0], [2,0], [0,1], [1,1], [3,0], [2,1]]
 
 for mode in modes:
     m = mode[1]
     n = mode[0]
     
-    freq = np.geomspace(1e6, 2e10, 1001)
+    freq = np.geomspace(1e6, 3e10, 501)
     k0 = np.zeros_like(freq)
     kc = np.zeros_like(freq)
     gamma = np.zeros_like(freq, dtype = complex)
     eps_eff = np.zeros_like(freq)
     
     for idx, el in enumerate(freq):
-        k0[idx], kc[idx], gamma[idx], eps_eff[idx] = compute_kc(a, b, zz, zt, m, n, el)
+        k0[idx], kc[idx], gamma[idx], eps_eff[idx] = compute_kc(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el)
     
     # The analytical dispersion equation for a rectangular waveguide
     ky_a= m*np.pi/b
@@ -121,9 +122,8 @@ for mode in modes:
     gamma_a = np.sqrt(kc_a**2 - k0_a**2, dtype=complex)
     eps_eff_a = (np.imag(gamma_a)/k0_a)**2
     
-    
-    ax.plot(k0*a, eps_eff, marker = "s", markevery=20, label =f"TE{n}{m}")
-    ax.plot(k0_a*a, eps_eff_a, marker = "s", markevery=30, label =f"TE{n}{m} Analytical")
+    ax.plot(k0*a, eps_eff, marker = "s", markevery=10, label =f"TE{n}{m}")
+    ax.plot(k0_a*a, eps_eff_a, marker = "s", markevery=20, label =f"TE{n}{m} Analytical")
     ax.set_ylabel('$\epsilon_{eff}$')
     ax.set_xlabel('$k_0 a$')
     
@@ -133,10 +133,12 @@ for mode in modes:
     ax.legend()
     
 plt.show()
+
 #%% Fields computation
 # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
 
 # Solve the eq.
+
 def solution(U):
     # find the eigenvalues and eigenvector of U(transpose).U
     e_vals, e_vecs = np.linalg.eig(np.dot(U.T, U))  
@@ -160,8 +162,17 @@ def compute_fields(a, b, zz, zt, m, n, freq, flag=True):
                   [-(zz*Z0*k0*kx+kc**2*Z0)*X, zz*Z0*k0*kx-kc**2*Z0, zz*Z0*gamma*ky*Z0*X, zz*Z0*gamma*ky*Z0]])
     
     # This is a vector [Gamma+ Gamma- Psi+ Psi-]
-    [Gammap, Gammam, Psip, Psim] = solution(M)
-    
+    # [Gammap, Gammam, Psip, Psim] = solution(M)
+    # print("Nontrivial solution 0:")
+    # print([Gammap, Gammam, Psip, Psim])
+ 
+    # Solve the homogeneous system Ax = 0 numerically
+    _, _, V = np.linalg.svd(M)
+    [Gammap, Gammam, Psip, Psim] = V[-1, :]
+    # Print the nontrivial solution
+    # print("Nontrivial solution 1:")
+    # print([Gammap, Gammam, Psip, Psim])
+ 
     try:
         alpha = Psim/Gammam
     except ZeroDivisionError:
@@ -179,15 +190,14 @@ def compute_fields(a, b, zz, zt, m, n, freq, flag=True):
         Ap = (Gammam*np.exp(1j*kx*x, dtype = complex)+Gammap*np.exp(-1j*kx*x, dtype = complex))
         Bp = (Psim*np.exp(1j*kx*x, dtype = complex)+Psip*np.exp(-1j*kx*x, dtype = complex))
         Am = (Gammam*np.exp(1j*kx*x, dtype = complex)-Gammap*np.exp(-1j*kx*x, dtype = complex))
-        Bm = (Psim*np.exp(1j*kx*x, dtype = complex)-Psip*np.exp(-1j*kx*x, dtype = complex))
-    
+        Bm = (Psim*np.exp(1j*kx*x, dtype = complex)-Psip*np.exp(-1j*kx*x, dtype = complex))    
     
         Ex = -1j*(gamma*kx*Am-Z0*k0*ky*Bp)*np.sin(ky*y)/(kc**2)
-        Ey = -(gamma*ky*Ap-Z0*k0*kx*Bm)*np.cos(ky*y)/(kc**2)
+        Ey = -(gamma*ky*Ap+Z0*k0*kx*Bm)*np.cos(ky*y)/(kc**2)
         Ez = Ap*np.sin(ky*y)
     
-        Hx = -1j*(k0*ky*Ap-Z0*gamma*kx*Bm)*np.cos(ky*y)/(Z0*kc**2)
-        Hy = -(k0*kx*Am+Z0*gamma*ky*Bp)*np.sin(ky*y)/(Z0*kc**2)
+        Hx = -1j*(-k0*ky*Ap+Z0*gamma*kx*Bm)*np.cos(ky*y)/(Z0*kc**2)
+        Hy = (k0*kx*Am+Z0*gamma*ky*Bp)*np.sin(ky*y)/(Z0*kc**2)
         Hz = Bp*np.cos(ky*y)
     
         return [Ex, Ey, Ez, Hx, Hy, Hz]
@@ -207,7 +217,7 @@ def compute_fields(a, b, zz, zt, m, n, freq, flag=True):
         return [fields, mesh, alpha, beta]
     else:
         return [alpha, beta]
-
+    
 #%% Testing field maps
 # Create a subplot with contourf
 fig, ax = plt.subplots(2,3, figsize=(10, 5))
@@ -215,13 +225,13 @@ fig, ax = plt.subplots(2,3, figsize=(10, 5))
 labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
 
 freq = 10e9
-A = compute_fields(a=a, b=b, zz=0, zt=0, m=1, n=1, freq=20e9)
+A = compute_fields(a=a, b=b, zz=0, zt=0, m=1, n=0, freq=15e9)
 
 for idx, el in enumerate(labels):
     row = idx // 3  # Determine the row (0 or 1)
     col = idx % 3   # Determine the column (0, 1, or 2)
 
-    contour = ax[row, col].contourf(A[1][0], A[1][1], np.abs(A[0][idx]), cmap='viridis', levels=100)
+    contour = ax[row, col].contourf(A[1][0], A[1][1], np.imag(A[0][idx])/np.real(A[0][idx]), cmap='viridis', levels=100)
     fig.colorbar(contour, ax=ax[row, col])
 
     # Add labels and title
@@ -275,7 +285,7 @@ plt.show()
 # Check all modes now (all, go up to some orders)
 """
 
-# The analytical dispersion equation for a rectangular waveguide
+#%% The analytical dispersion equation for a rectangular waveguide
 
 def compute_fields_a(a, b, m, n, freq, flag):
 
@@ -336,14 +346,14 @@ fig, ax = plt.subplots(2,3, figsize=(10, 5))
 labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
 
 m = 1
-n = 1
-A = compute_fields_a(a=a, b=b, m=m, n=n, freq=20e9, flag="TM")
+n = 0
+A = compute_fields_a(a=a, b=b, m=m, n=n, freq=20e9, flag="TE")
 
 for idx, el in enumerate(labels):
     row = idx // 3  # Determine the row (0 or 1)
     col = idx % 3   # Determine the column (0, 1, or 2)
 
-    contour = ax[row, col].contourf(A[1][0], A[1][1], np.abs(A[0][idx]), cmap='viridis', levels=100)
+    contour = ax[row, col].contourf(A[1][0], A[1][1], np.real(A[0][idx]), cmap='viridis', levels=100)
     fig.colorbar(contour, ax=ax[row, col])
 
     # Add labels and title
@@ -365,6 +375,8 @@ fig, ax = plt.subplots(2,3, figsize=(10, 5))
 
 labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
 
+a = 22.86e-3 # Long side of waveguide
+b = 10.16e-3 # Short side of waveguide
 m = 1
 n = 1
 TEanalytical = compute_fields_a(a=a, b=b, m=m, n=n, freq=20e9, flag="TE")
@@ -375,7 +387,7 @@ for idx, el in enumerate(labels):
     row = idx // 3  # Determine the row (0 or 1)
     col = idx % 3   # Determine the column (0, 1, or 2)
 
-    contour = ax[row, col].contourf(A[1][0], A[1][1], np.abs(np.imag(A[0][idx])/np.imag(np.imag(A[0][idx]))-np.imag(TManalytical[0][idx])/np.amax(np.imag(TManalytical[0][idx]))-np.imag(TEanalytical[0][idx])/np.amax(np.imag(TEanalytical[0][idx]))), cmap='viridis', levels=100)
+    contour = ax[row, col].contourf(A[1][0], A[1][1], np.abs(np.real(A[0][idx])/np.amax(np.real(A[0][idx]))-np.real(TEanalytical[0][idx])/np.amax(np.real(TEanalytical[0][idx]))), cmap='viridis', levels=100)
     fig.colorbar(contour, ax=ax[row, col])
 
     # Add labels and title
@@ -386,8 +398,263 @@ for idx, el in enumerate(labels):
     ax[row, col].set_aspect('equal')
 
 # Set a title for the whole figure
-fig.suptitle(f'TE{n}{m} analytical, WR90', fontsize=16)
+fig.suptitle(f'TE{n}{m} diff, WR90', fontsize=16)
 
 # Show the plot
 plt.tight_layout()
 plt.show()
+
+#%% Computation of alpha
+
+# This is the version that benchmarks the idea of splitting the integrals
+def alpha(a, b, zz, zt, m, n, freq, sigma):
+    # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
+    # Here we follow [Benedikt Byrne. “Etude et conception de guides d’onde et 
+# d’antennes cornets `a m ́etamat ́eriaux”. PhD thesis. Nov. 2016. url: https://oatao.univ-toulouse.fr/172 [Byr16]
+
+    omega = 2*np.pi*freq
+    
+    [Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=freq)[0]
+    #[Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields_a(a=a, b=b, m=m, n=n, freq=freq, flag="TE")[0]
+    # Power flow integral
+    integrand = Ex*np.conjugate(Hy) - Ey*np.conjugate(Hx)
+    # The integral you can do it as a simple sum
+    Pnm = 1/2*np.real(np.sum(np.sum(integrand*a*b/100/100)))
+    # I now need four currents, one for every side of the waveguide
+    
+    # Fields and currents for x = 0, normal is [-1, 0, 0]
+    n = np.array([-1, 0, 0])
+    H_xe0 = np.array([Hx[:,0], Hy[:,0], Hz[:,0]])
+
+    J_xe0 = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_xe0.append(np.cross(n, H_xe0[:,idx]))
+
+    J_xe0 = np.array(J_xe0)
+
+    # Fields and currents for x = a, normal is [1, 0, 0]
+    n = np.array([1, 0, 0])
+    H_xea = np.array([Hx[:,-1], Hy[:,-1], Hz[:,-1]])
+
+    J_xea = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_xea.append(np.cross(n, H_xea[:,idx]))
+
+    J_xea = np.array(J_xea)
+
+    # Fields and currents for y = 0, normal is [0, -1, 0]
+    n = np.array([0, -1, 0])
+    H_ye0 = np.array([Hx[0,:], Hy[0,:], Hz[0,:]])
+
+    J_ye0 = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_ye0.append(np.cross(n, H_ye0[:,idx]))
+
+    J_ye0 = np.array(J_ye0)
+
+    # Fields and currents for y = b, normal is [0, 1, 0]
+    n = np.array([0, 1, 0])
+    H_yeb = np.array([Hx[-1,:], Hy[-1,:], Hz[-1,:]])
+
+    J_yeb = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_yeb.append(np.cross(n, H_yeb[:,idx]))
+
+    J_yeb = np.array(J_yeb)
+    
+    # Now we compute the losses
+    # Resistance of the metal walls
+    Rm = np.sqrt(omega*sc.mu_0/2/sigma)
+    Rzz = np.real(zz)
+    Rzt = np.real(zt)
+
+    int1 = []
+    for idx, el in enumerate(J_xe0[:,0]):
+        int1.append(np.dot(J_xe0[idx], np.conjugate(J_xe0[idx]))*b/100)
+    Pl1 = Rm/2*np.sum(int1)
+
+    int2 = []
+    for idx, el in enumerate(J_xea[:,0]):
+        int2.append(np.dot(J_xea[idx], np.conjugate(J_xea[idx]))*b/100)
+    Pl2 = Rm/2*np.sum(int2)
+
+    int3 = []
+    for idx, el in enumerate(J_ye0[:,0]):
+        int3.append(np.dot(J_ye0[idx], np.conjugate(J_ye0[idx]))*a/100)
+    Pl3 = Rm/2*np.sum(int3)
+
+    int4z = []
+    int4t = []
+    for idx, el in enumerate(J_yeb[:,0]):
+        Pl4t = np.dot(J_yeb[idx,0], np.conjugate(J_yeb[idx,0]))*a/100
+        Pl4z = np.dot(J_yeb[idx,2], np.conjugate(J_yeb[idx,2]))*a/100
+        int4z.append(Pl4z)
+        int4t.append(Pl4t)
+    Pl4 = Rm/2*np.sum(int4z) + Rm/2*np.sum(int4t) # Per ora è isotropa
+
+    Pl = Pl1+Pl2+Pl3+Pl4
+    
+    # This is alpha in dB
+    alpha = Pl/2/Pnm * 8.686
+    if np.abs(alpha) > 10:
+        alpha = np.nan
+    
+    return alpha
+
+#%%
+def alpha_a(a, b, zz, zt, m, n, freq, sigma):
+    # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
+    # Here we follow [Benedikt Byrne. “Etude et conception de guides d’onde et 
+# d’antennes cornets `a m ́etamat ́eriaux”. PhD thesis. Nov. 2016. url: https://oatao.univ-toulouse.fr/172 [Byr16]
+
+    omega = 2*np.pi*freq
+    
+    #[Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=freq)[0]
+    [Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields_a(a=a, b=b, m=m, n=n, freq=freq, flag="TE")[0]
+    # Power flow integral
+    integrand = Ex*np.conjugate(Hy) - Ey*np.conjugate(Hx)
+    # The integral you can do it as a simple sum
+    Pnm = 1/2*np.real(np.sum(np.sum(integrand*a*b/100/100)))
+    # I now need four currents, one for every side of the waveguide
+    
+    # Fields and currents for x = 0, normal is [-1, 0, 0]
+    n = np.array([-1, 0, 0])
+    H_xe0 = np.array([Hx[:,0], Hy[:,0], Hz[:,0]])
+
+    J_xe0 = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_xe0.append(np.cross(n, H_xe0[:,idx]))
+
+    J_xe0 = np.array(J_xe0)
+
+    # Fields and currents for x = a, normal is [1, 0, 0]
+    n = np.array([1, 0, 0])
+    H_xea = np.array([Hx[:,-1], Hy[:,-1], Hz[:,-1]])
+
+    J_xea = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_xea.append(np.cross(n, H_xea[:,idx]))
+
+    J_xea = np.array(J_xea)
+
+    # Fields and currents for y = 0, normal is [0, -1, 0]
+    n = np.array([0, -1, 0])
+    H_ye0 = np.array([Hx[0,:], Hy[0,:], Hz[0,:]])
+
+    J_ye0 = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_ye0.append(np.cross(n, H_ye0[:,idx]))
+
+    J_ye0 = np.array(J_ye0)
+
+    # Fields and currents for y = b, normal is [0, 1, 0]
+    n = np.array([0, 1, 0])
+    H_yeb = np.array([Hx[-1,:], Hy[-1,:], Hz[-1,:]])
+
+    J_yeb = []
+
+    for idx, el in enumerate(Hx[:,0]):
+        J_yeb.append(np.cross(n, H_yeb[:,idx]))
+
+    J_yeb = np.array(J_yeb)
+    
+    # Now we compute the losses
+    # Resistance of the metal walls
+    Rm = np.sqrt(omega*sc.mu_0/2/sigma)
+    Rzz = np.real(zz)
+    Rzt = np.real(zt)
+
+    int1 = []
+    for idx, el in enumerate(J_xe0[:,0]):
+        int1.append(np.dot(J_xe0[idx], np.conjugate(J_xe0[idx]))*b/100)
+    Pl1 = Rm/2*np.sum(int1)
+
+    int2 = []
+    for idx, el in enumerate(J_xea[:,0]):
+        int2.append(np.dot(J_xea[idx], np.conjugate(J_xea[idx]))*b/100)
+    Pl2 = Rm/2*np.sum(int2)
+
+    int3 = []
+    for idx, el in enumerate(J_ye0[:,0]):
+        int3.append(np.dot(J_ye0[idx], np.conjugate(J_ye0[idx]))*a/100)
+    Pl3 = Rm/2*np.sum(int3)
+
+    int4z = []
+    int4t = []
+    for idx, el in enumerate(J_yeb[:,0]):
+        Pl4t = np.dot(J_yeb[idx,0], np.conjugate(J_yeb[idx,0]))*a/100
+        Pl4z = np.dot(J_yeb[idx,2], np.conjugate(J_yeb[idx,2]))*a/100
+        int4z.append(Pl4z)
+        int4t.append(Pl4t)
+    Pl4 = Rm/2*np.sum(int4z) + Rm/2*np.sum(int4t) # Per ora è isotropa
+
+    Pl = Pl1+Pl2+Pl3+Pl4
+    
+    # This is alpha in dB
+    alpha = Pl/2/Pnm * 8.686
+
+    return alpha
+
+
+#%% Benchmark with multiple modes
+
+fig, ax = plt.subplots(figsize=(4, 2))
+
+modes = [[1,0], [2,0], [1,1], [0,1]]
+#modes = [[1,0]]
+
+for mode in modes:
+    m = mode[1]
+    n = mode[0]
+
+    alphadB = []
+    alphadB_a = []
+    
+    frequencies = np.linspace(7e9, 40e9, 100)
+    
+    # The waveguide (WR90)
+    a = 22.86e-3 # Long side of waveguide
+    b = 10.16e-3 # Short side of waveguide
+    sigma = 5.8e7 # Brass
+    Rm_ = []
+    zt = 0
+    zz = 0
+    
+    # For the analytical expression
+    ky= m*np.pi/b
+    kx= n*np.pi/a
+    kc = np.sqrt(kx**2 + ky**2)
+    Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
+    
+    for el in frequencies:
+        #alphadB.append(alpha(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
+        alphadB.append(alpha(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
+            
+        k0 = 2*np.pi*el*np.sqrt(sc.epsilon_0*sc.mu_0)
+        
+        Rm = np.sqrt(2*np.pi*el*sc.mu_0/2/sigma)
+        Rm_.append(Rm)
+        if m == 0 or n==0:
+            app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+b/a*(1/2-kc**2/k0**2)*(n**2*a*b+m**2*a**2)/(n**2*b**2+m**2*a**2))
+            #app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*(1/2+b/a*kc**2/k0**2)
+        else:
+            app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+b/a*(1-kc**2/k0**2)*(n**2*a*b+m**2*a**2)/(n**2*b**2+m**2*a**2))
+            #app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+(1-kc**2/k0**2)*(m**2*b**2+n**2*a*b)/(n**2*a**2+m**2*b**2))
+            
+        alphadB_a.append(app*8.686)
+        # alphadB_a.append(alpha_a(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
+        
+    #ax.plot(frequencies, alphadB, label = f"TE{n}{m} numerical")
+    #ax.plot(frequencies, alphadB_a, label = f"TE{n}{m} analytical")
+    ax.plot(frequencies, Rm_, label = f"TE{n}{m} numerical")
+    
+    plt.legend()
+#ax.set_ylim(0, 0.4)   
+ax.grid(True)
