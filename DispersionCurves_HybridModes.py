@@ -617,12 +617,12 @@ for mode in modes:
     alphadB = []
     alphadB_a = []
     
-    frequencies = np.linspace(7e9, 40e9, 100)
+    frequencies = np.linspace(7e9, 30e9, 100)
     
     # The waveguide (WR90)
     a = 22.86e-3 # Long side of waveguide
     b = 10.16e-3 # Short side of waveguide
-    sigma = 5.8e7 # Brass
+    sigma = 5.8e7 
     Rm_ = []
     zt = 0
     zz = 0
@@ -651,9 +651,9 @@ for mode in modes:
         alphadB_a.append(app*8.686)
         # alphadB_a.append(alpha_a(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
         
-    #ax.plot(frequencies, alphadB, label = f"TE{n}{m} numerical")
-    #ax.plot(frequencies, alphadB_a, label = f"TE{n}{m} analytical")
-    ax.plot(frequencies, Rm_, label = f"TE{n}{m} numerical")
+    ax.plot(frequencies, alphadB, label = f"TE{n}{m} numerical")
+    ax.plot(frequencies, alphadB_a, label = f"TE{n}{m}   analytical")
+    # ax.plot(frequencies, Rm_, label = f"TE{n}{m} numerical")
     
     plt.legend()
 #ax.set_ylim(0, 0.4)   
