@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jan 16 15:16:59 2024
+Module to compute dispersion curve, field distribution and attenuation
+coefficients in rectangular waveguides with vertical anisotropic impedance 
+boundary conditions.
+
+The code is based on the work from...
 
 @author: Leonardo Sito
 """
-
 #%% Importing Modules
 
 # Plot in separate window
@@ -18,83 +21,119 @@ from scipy.optimize import fsolve
 from scipy.signal import find_peaks
 import scipy.constants as sc
 
-#%% Definition of global parmeters for testing
+#%% Dispersion Curve calculation
+class DispersionCurve():
+    '''Computing dispersion curve
 
-# WR90
-a = 22.86e-3 # Long side of waveguide
-b = 10.16e-3 # Short side of waveguide
+    Enables to create a dispersion curve object related to the rectangular
+    waveguide with vertical anisotropic walls specified. 
 
-zz = 0
-zt = 0
-
-#%% Dispersion relation m = 0, the mode is TE
-def f_of_kc_me0(kc, freq):
-
-    omega = 2*np.pi*freq
-    k0 = omega*np.sqrt(sc.epsilon_0*sc.mu_0)
-    X = np.exp(-1j*2*kc*a, dtype = complex)
-    
-    f = np.abs(zt**2*(1-X) - 2*k0/kc*zt*(1+X) + (k0/kc)**2 * (1-X))
-
-    return f
-
-#%% Dispersion relation m != 0 we do not know if the mode is TE, TM or Hybrid
-def f_of_kc_mne0(kc, m, freq):
-
-        omega = 2*np.pi*freq
-        k0 = omega*np.sqrt(sc.epsilon_0*sc.mu_0)
-
-        ky = m*np.pi/b
-        kx = np.sqrt(kc**2-ky**2, dtype = complex)
-        gamma = np.sqrt(kc**2-k0**2, dtype = complex)
-
-        X = np.exp(-1j*2*kx*a, dtype = complex)
+    Parameters
+    ----------
+    a : float, default 22.86e-3
+        Long side of the waveguide in m
+    b : float, default 10.16e-3
+        Short side of the waveguide in m
+    zz : complex, default 0
+        Longitudinal part of the anisotropic surface impedance    
+    zt : complex, default 0
+        Transverse part of the anisotropic surface impedance    
+    m : int
+        Mode number index (TEnm, TMnm)    
+    n : int
+        Mode number index (TEnm, TMnm)    
+    freq : float
+        Frequency point
         
-        K0xc = k0*kx/kc**2
-        Kzyc = gamma*ky/kc**2
-
-        if np.abs(zt)+np.abs(zz)==0: # The metal waveguide condition
-            f = np.abs(1-X)
+    Attributes
+    ----------
+    gamma : numpy.ndarray list
+        Beam longitudinal distribution in time, normalized. Returns the list of numpy arrays [time, profile]
+    eps_eff : numpy.ndarray list 
+        Beam spectrum in frequency. Returns the list of numpy arrays [frequency, spectrum]
+    powerSpectrum : numpy.ndarray list
+        Beam power spectrum in frequency. Returns the list of numpy arrays [frequency, powerspectrum]
+    totalBeamCharge : float
+        Beam charge computed from intensity and number of filled slots, in Coulombs [C]
+    '''
+    
+    def __init__(self, a=22.86e-3, b=10.16e-3, zz=0, zt=0, m=0, n=1, freq=10e9):
+        
+        self.a = a
+        self.b = b
+        self.zz = zz
+        self.zt = zt
+        self.m = m
+        self.n = n
+        self.freq = freq
+        
+        # Dispersion relation m = 0, the mode is TE
+        def f_of_kc_me0(kc, freq):
+        
+            omega = 2*np.pi*freq
+            k0 = omega*np.sqrt(sc.epsilon_0*sc.mu_0)
+            X = np.exp(-1j*2*kc*a, dtype = complex)
+            
+            f = np.abs(zt**2*(1-X) - 2*k0/kc*zt*(1+X) + (k0/kc)**2 * (1-X))
+        
+            return f
+        
+        # Dispersion relation m != 0 we do not know if the mode is TE, TM or Hybrid
+        def f_of_kc_mne0(kc, m, freq):
+        
+                omega = 2*np.pi*freq
+                k0 = omega*np.sqrt(sc.epsilon_0*sc.mu_0)
+        
+                ky = m*np.pi/b
+                kx = np.sqrt(kc**2-ky**2, dtype = complex)
+                gamma = np.sqrt(kc**2-k0**2, dtype = complex)
+        
+                X = np.exp(-1j*2*kx*a, dtype = complex)
+                
+                K0xc = k0*kx/kc**2
+                Kzyc = gamma*ky/kc**2
+        
+                if np.abs(zt)+np.abs(zz)==0: # The metal waveguide condition
+                    f = np.abs(1-X)
+                else:
+                    f = np.abs(
+                        2*Kzyc**2*zz*(-zt+(X+1)/(1-X)*K0xc*(zz*zt+1)-K0xc**2*zz)
+                        + (Kzyc**4+K0xc**4)*zz**2-2*K0xc**3*(X+1)/(1-X)*zz*(zz*zt+1)
+                        + K0xc**2*(1+(zz*zt)**2+4*((X+1)/(1-X))**2*zz*zt)
+                        - 2*K0xc*(X+1)/(1-X)*zt*(1+zz*zt)
+                        + zt**2
+                        )
+        
+                return f
+            
+        if self.m == 0:
+            x = np.linspace(1, 1000, 10000) # Hard coded, not nice!
+            roots_idx = find_peaks(-f_of_kc_me0(x, self.freq))[0]
+            
+            roots = x[roots_idx]
+            self.kc = roots[n-1] # Because there is no TEM
+            
         else:
-            f = np.abs(
-                2*Kzyc**2*zz*(-zt+(X+1)/(1-X)*K0xc*(zz*zt+1)-K0xc**2*zz)
-                + (Kzyc**4+K0xc**4)*zz**2-2*K0xc**3*(X+1)/(1-X)*zz*(zz*zt+1)
-                + K0xc**2*(1+(zz*zt)**2+4*((X+1)/(1-X))**2*zz*zt)
-                - 2*K0xc*(X+1)/(1-X)*zt*(1+zz*zt)
-                + zt**2
-                )
-
-        return f
-
-#%% Root finding of the dispersion equation and support variables
-
-# Note: here "n" is the nth zero of f(kc), then we need a way to call the modes
-
-def compute_kc(a, b, zz, zt, m, n, freq):
-    if m == 0:
-        x = np.linspace(1, 1000, 10000) # Hard coded, not nice!
-        roots_idx = find_peaks(-f_of_kc_me0(x, freq))[0]
+            x = np.linspace(1, 600, 10000) # Hard coded, not nice!
+            roots_idx = find_peaks(-f_of_kc_mne0(x, self.m, self.freq))[0]
+            
+            roots = x[roots_idx]
+            self.kc = roots[n]
         
-        roots = x[roots_idx]
-        kc_ = roots[n-1] # Because there is no TEM
-    else:
-        x = np.linspace(1, 600, 10000) # Hard coded, not nice!
-        roots_idx = find_peaks(-f_of_kc_mne0(x, m, freq))[0]
+        self.k0 = 2*np.pi*self.freq*np.sqrt(sc.epsilon_0*sc.mu_0)
         
-        roots = x[roots_idx]
-        kc_ = roots[n]
-    
-    k0_ = 2*np.pi*freq*np.sqrt(sc.epsilon_0*sc.mu_0)
-    # gamma_ = np.sqrt(kc_**2 - k0_**2, dtype=complex)
-    gamma_ = np.sqrt(kc_**2 - k0_**2, dtype=complex)
-    eps_eff_ = (np.imag(gamma_)/k0_)**2
+        # gamma_ = np.sqrt(kc_**2 - k0_**2, dtype=complex)
+        self.gamma = np.sqrt(self.kc**2 - self.k0**2, dtype=complex)
+        self.eps_eff = (np.imag(self.gamma)/self.k0)**2
 
-    return k0_, kc_, gamma_, eps_eff_
-
-  
 #%% Test Dispersion curves with analytical eq from TE
 
 fig, ax = plt.subplots()
+
+a=22.86e-3
+b=10.16e-3
+zz = 0
+zt = 0
 
 modes = [[1,0], [2,0], [0,1], [1,1], [3,0], [2,1]]
 
@@ -109,7 +148,11 @@ for mode in modes:
     eps_eff = np.zeros_like(freq)
     
     for idx, el in enumerate(freq):
-        k0[idx], kc[idx], gamma[idx], eps_eff[idx] = compute_kc(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el)
+        params = DispersionCurve(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el)
+        k0[idx] = params.k0
+        kc[idx] = params.kc
+        gamma[idx] = params.gamma
+        eps_eff[idx] = params.eps_eff
     
     # The analytical dispersion equation for a rectangular waveguide
     ky_a= m*np.pi/b
@@ -122,7 +165,7 @@ for mode in modes:
     gamma_a = np.sqrt(kc_a**2 - k0_a**2, dtype=complex)
     eps_eff_a = (np.imag(gamma_a)/k0_a)**2
     
-    ax.plot(k0*a, eps_eff, marker = "s", markevery=10, label =f"TE{n}{m}")
+    ax.plot(k0*a, eps_eff, marker = "s", markevery=10, label =f"TE{n}{m} Mode Theory")
     ax.plot(k0_a*a, eps_eff_a, marker = "s", markevery=20, label =f"TE{n}{m} Analytical")
     ax.set_ylabel('$\epsilon_{eff}$')
     ax.set_xlabel('$k_0 a$')
@@ -133,7 +176,6 @@ for mode in modes:
     ax.legend()
     
 plt.show()
-
 #%% Fields computation
 # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
 
