@@ -32,46 +32,21 @@ class Waveguide:
 
 #%% Dispersion Curve calculation
 class DispersionCurve:
-    '''Computing dispersion curve
-
-    Enables to create a dispersion curve object related to the rectangular
-    waveguide with vertical anisotropic walls specified. 
-
-    Parameters
-    ----------
-    a : float, default 22.86e-3
-        Long side of the waveguide in m
-    b : float, default 10.16e-3
-        Short side of the waveguide in m
-    zz : complex, default 0
-        Longitudinal part of the anisotropic surface impedance    
-    zt : complex, default 0
-        Transverse part of the anisotropic surface impedance    
-    m : int
-        Mode number index (TEnm, TMnm)    
-    n : int
-        Mode number index (TEnm, TMnm)    
-    freq : float
-        Frequency point
-        
-    Attributes
-    ----------
-    gamma : numpy.ndarray list
-        Beam longitudinal distribution in time, normalized. Returns the list of numpy arrays [time, profile]
-    eps_eff : numpy.ndarray list 
-        Beam spectrum in frequency. Returns the list of numpy arrays [frequency, spectrum]
-    powerSpectrum : numpy.ndarray list
-        Beam power spectrum in frequency. Returns the list of numpy arrays [frequency, powerspectrum]
-    totalBeamCharge : float
-        Beam charge computed from intensity and number of filled slots, in Coulombs [C]
-    '''
+    '''Computing dispersion curve'''
     
-    def __init__(self, a, b, zz, zt, n, m, freq):
+    def __init__(self, waveguide, n, m, freq):
         
+        self.waveguide = waveguide
         self.n = n
         self.m = m
         self.freq = freq
 
+        self.k0 = 2*np.pi*self.freq*np.sqrt(sc.epsilon_0*sc.mu_0)
+        self.kc = self.get_kc()
+        self.gamma = self.get_gamma()
+        self.eps_eff = self.get_eps_eff()
+
+    def get_kc(self):
         # Dispersion relation m = 0, the mode is TE
         def f_of_kc_me0(kc, freq):
         
@@ -116,20 +91,24 @@ class DispersionCurve:
             roots_idx = find_peaks(-f_of_kc_me0(x, self.freq))[0]
             
             roots = x[roots_idx]
-            self.kc = roots[n-1] # Because there is no TEM
+            kc = roots[n-1] # Because there is no TEM
             
         else:
             x = np.linspace(1, 600, 10000) # Hard coded, not nice!
             roots_idx = find_peaks(-f_of_kc_mne0(x, self.m, self.freq))[0]
             
             roots = x[roots_idx]
-            self.kc = roots[n]
+            kc = roots[n]
         
-        self.k0 = 2*np.pi*self.freq*np.sqrt(sc.epsilon_0*sc.mu_0)
+        return kc
         
-        # gamma_ = np.sqrt(kc_**2 - k0_**2, dtype=complex)
-        self.gamma = np.sqrt(self.kc**2 - self.k0**2, dtype=complex)
-        self.eps_eff = (np.imag(self.gamma)/self.k0)**2
+    def get_gamma(self):
+        gamma = np.sqrt(self.kc**2 - self.k0**2, dtype=complex)
+        return gamma
+    
+    def get_eps_eff(self):
+        eps_eff = (np.imag(self.gamma)/self.k0)**2
+        return eps_eff
 
 #%% Test Dispersion curves with analytical eq from TE
 
@@ -137,8 +116,8 @@ fig, ax = plt.subplots()
 
 a=22.86e-3
 b=10.16e-3
-zz = 0
-zt = 0
+
+WR90 = Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
 
 modes = [[1,0], [2,0], [0,1], [1,1], [3,0], [2,1]]
 
@@ -153,7 +132,7 @@ for mode in modes:
     eps_eff = np.zeros_like(freq)
     
     for idx, el in enumerate(freq):
-        params = DispersionCurve(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el)
+        params = DispersionCurve(WR90, m=m, n=n, freq=el)
         k0[idx] = params.k0
         kc[idx] = params.kc
         gamma[idx] = params.gamma
