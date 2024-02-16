@@ -173,6 +173,39 @@ class Fields:
 
         def compute_params(self):
 
+            ky = self.dispersionCurve.m*np.pi/self.waveguide.b
+            kx = np.sqrt(self.dispersionCurve.kc**2-ky**2, dtype = complex)
+            
+            Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
+            X = np.exp(-1j*2*kx*self.waveguide.a, dtype = complex)
+            
+            # 1. Build the matrix
+            M = np.array([[gamma*ky, gamma*ky, zt*Z0*kc**2-Z0*k0*kx, zt*Z0*kc**2+Z0*k0*kx],
+                        [gamma*ky*X, gamma*ky, -(zt*Z0*kc**2+Z0*k0*kx)*X, -zt*Z0*kc**2+Z0*k0*kx],
+                        [-zz*Z0*k0*kx+kc**2*Z0, zz*Z0*k0*kx+kc**2*Z0, zz*Z0*gamma*ky*Z0, zz*Z0*gamma*ky*Z0],
+                        [-(zz*Z0*k0*kx+kc**2*Z0)*X, zz*Z0*k0*kx-kc**2*Z0, zz*Z0*gamma*ky*Z0*X, zz*Z0*gamma*ky*Z0]])
+            
+            # This is a vector [Gamma+ Gamma- Psi+ Psi-]
+            # [Gammap, Gammam, Psip, Psim] = solution(M)
+            # print("Nontrivial solution 0:")
+            # print([Gammap, Gammam, Psip, Psim])
+        
+            # Solve the homogeneous system Ax = 0 numerically
+            _, _, V = np.linalg.svd(M)
+            [Gammap, Gammam, Psip, Psim] = V[-1, :]
+            # Print the nontrivial solution
+            # print("Nontrivial solution 1:")
+            # print([Gammap, Gammam, Psip, Psim])
+        
+            try:
+                alpha = Psim/Gammam
+            except ZeroDivisionError:
+                alpha = float('inf')
+            
+            try:
+                beta = Gammam/Psim
+            except ZeroDivisionError:
+                beta = float('inf')
 
 # Solve the eq.
 
