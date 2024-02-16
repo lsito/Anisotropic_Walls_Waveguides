@@ -11,7 +11,7 @@ The code is based on the work from...
 #%% Importing Modules
 
 # Plot in separate window
-%matplotlib qt
+# %matplotlib qt
 
 import numpy as np
 import matplotlib as mpl
@@ -21,8 +21,17 @@ from scipy.optimize import fsolve
 from scipy.signal import find_peaks
 import scipy.constants as sc
 
+#%% Waveguide class
+class Waveguide:
+    def __init__(self, a, b, zz, zt, sigma):
+        self.a = a
+        self.b = b
+        self.zz = zz
+        self.zt = zt
+        self.sigma = sigma
+
 #%% Dispersion Curve calculation
-class DispersionCurve():
+class DispersionCurve:
     '''Computing dispersion curve
 
     Enables to create a dispersion curve object related to the rectangular
@@ -57,16 +66,12 @@ class DispersionCurve():
         Beam charge computed from intensity and number of filled slots, in Coulombs [C]
     '''
     
-    def __init__(self, a=22.86e-3, b=10.16e-3, zz=0, zt=0, m=0, n=1, freq=10e9):
+    def __init__(self, a, b, zz, zt, n, m, freq):
         
-        self.a = a
-        self.b = b
-        self.zz = zz
-        self.zt = zt
-        self.m = m
         self.n = n
+        self.m = m
         self.freq = freq
-        
+
         # Dispersion relation m = 0, the mode is TE
         def f_of_kc_me0(kc, freq):
         
