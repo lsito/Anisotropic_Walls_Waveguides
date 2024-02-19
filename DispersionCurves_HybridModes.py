@@ -171,91 +171,53 @@ class Fields:
         self.Nx = Nx
         self.Ny = Ny
 
-        def compute_params(self):
+        self.Gammap = None 
+        self.Gammam = None 
+        self.Pisp = None
+        self.Psim = None 
 
-            ky = self.dispersionCurve.m*np.pi/self.waveguide.b
-            kx = np.sqrt(self.dispersionCurve.kc**2-ky**2, dtype = complex)
-            
-            Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
-            X = np.exp(-1j*2*kx*self.waveguide.a, dtype = complex)
-            
-            # 1. Build the matrix
-            M = np.array([[gamma*ky, gamma*ky, zt*Z0*kc**2-Z0*k0*kx, zt*Z0*kc**2+Z0*k0*kx],
-                        [gamma*ky*X, gamma*ky, -(zt*Z0*kc**2+Z0*k0*kx)*X, -zt*Z0*kc**2+Z0*k0*kx],
-                        [-zz*Z0*k0*kx+kc**2*Z0, zz*Z0*k0*kx+kc**2*Z0, zz*Z0*gamma*ky*Z0, zz*Z0*gamma*ky*Z0],
-                        [-(zz*Z0*k0*kx+kc**2*Z0)*X, zz*Z0*k0*kx-kc**2*Z0, zz*Z0*gamma*ky*Z0*X, zz*Z0*gamma*ky*Z0]])
-            
-            # This is a vector [Gamma+ Gamma- Psi+ Psi-]
-            # [Gammap, Gammam, Psip, Psim] = solution(M)
-            # print("Nontrivial solution 0:")
-            # print([Gammap, Gammam, Psip, Psim])
+        self.alpha = None
+        self.beta = None
+
+        self.compute_params()
+
+    def compute_params(self):
+
+        ky = self.dispersionCurve.m*np.pi/self.waveguide.b
+        kx = np.sqrt(self.dispersionCurve.kc**2-ky**2, dtype = complex)
         
-            # Solve the homogeneous system Ax = 0 numerically
-            _, _, V = np.linalg.svd(M)
-            [Gammap, Gammam, Psip, Psim] = V[-1, :]
-            # Print the nontrivial solution
-            # print("Nontrivial solution 1:")
-            # print([Gammap, Gammam, Psip, Psim])
+        Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
+        X = np.exp(-1j*2*kx*self.waveguide.a, dtype = complex)
         
-            try:
-                alpha = Psim/Gammam
-            except ZeroDivisionError:
-                alpha = float('inf')
-            
-            try:
-                beta = Gammam/Psim
-            except ZeroDivisionError:
-                beta = float('inf')
+        gamma = self.dispersionCurve.gamma
+        zt = self.waveguide.zt
+        zz = self.waveguide.zz
+        kc = self.dispersionCurve.kc
 
-# Solve the eq.
-
-def solution(U):
-    # find the eigenvalues and eigenvector of U(transpose).U
-    e_vals, e_vecs = np.linalg.eig(np.dot(U.T, U))  
-    # extract the eigenvector (column) associated with the minimum eigenvalue
-    return e_vecs[:, np.argmin(e_vals)]     
-
-def compute_fields(a, b, zz, zt, m, n, freq, flag=True):
+        # 1. Build the matrix
+        M = np.array([[gamma*ky, gamma*ky, zt*Z0*kc**2-Z0*k0*kx, zt*Z0*kc**2+Z0*k0*kx],
+                    [gamma*ky*X, gamma*ky, -(zt*Z0*kc**2+Z0*k0*kx)*X, -zt*Z0*kc**2+Z0*k0*kx],
+                    [-zz*Z0*k0*kx+kc**2*Z0, zz*Z0*k0*kx+kc**2*Z0, zz*Z0*gamma*ky*Z0, zz*Z0*gamma*ky*Z0],
+                    [-(zz*Z0*k0*kx+kc**2*Z0)*X, zz*Z0*k0*kx-kc**2*Z0, zz*Z0*gamma*ky*Z0*X, zz*Z0*gamma*ky*Z0]])
+        
+        # 2. Solve the homogeneous system Ax = 0 numerically
+        _, _, V = np.linalg.svd(M)
+        [self.Gammap, self.Gammam, self.Psip, self.Psim] = V[-1, :]
     
-    k0, kc, gamma, eps_eff = compute_kc(a, b, zz, zt, m, n, freq)
-
-    ky = m*np.pi/b
-    kx = np.sqrt(kc**2-ky**2, dtype = complex)
-    
-    Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
-    X = np.exp(-1j*2*kx*a, dtype = complex)
-    
-    # 1. Build the matrix
-    M = np.array([[gamma*ky, gamma*ky, zt*Z0*kc**2-Z0*k0*kx, zt*Z0*kc**2+Z0*k0*kx],
-                  [gamma*ky*X, gamma*ky, -(zt*Z0*kc**2+Z0*k0*kx)*X, -zt*Z0*kc**2+Z0*k0*kx],
-                  [-zz*Z0*k0*kx+kc**2*Z0, zz*Z0*k0*kx+kc**2*Z0, zz*Z0*gamma*ky*Z0, zz*Z0*gamma*ky*Z0],
-                  [-(zz*Z0*k0*kx+kc**2*Z0)*X, zz*Z0*k0*kx-kc**2*Z0, zz*Z0*gamma*ky*Z0*X, zz*Z0*gamma*ky*Z0]])
-    
-    # This is a vector [Gamma+ Gamma- Psi+ Psi-]
-    # [Gammap, Gammam, Psip, Psim] = solution(M)
-    # print("Nontrivial solution 0:")
-    # print([Gammap, Gammam, Psip, Psim])
- 
-    # Solve the homogeneous system Ax = 0 numerically
-    _, _, V = np.linalg.svd(M)
-    [Gammap, Gammam, Psip, Psim] = V[-1, :]
-    # Print the nontrivial solution
-    # print("Nontrivial solution 1:")
-    # print([Gammap, Gammam, Psip, Psim])
- 
-    try:
-        alpha = Psim/Gammam
-    except ZeroDivisionError:
-        alpha = float('inf')
-    
-    try:
-        beta = Gammam/Psim
-    except ZeroDivisionError:
-        beta = float('inf')
+        # 3. Evaluate coupling of the modes
+        try:
+            self.alpha = self.Psim/self.Gammam
+        except ZeroDivisionError:
+            self.alpha = float('inf')
+        
+        try:
+            self.beta = self.Gammam/self.Psim
+        except ZeroDivisionError:
+            self.beta = float('inf')
     
     # Compute all the fields:
     # We still need the dependace from z
-    def compute(x, y):
+    def compute_fields(x, y):
         # Supporting pieces
         Ap = (Gammam*np.exp(1j*kx*x, dtype = complex)+Gammap*np.exp(-1j*kx*x, dtype = complex))
         Bp = (Psim*np.exp(1j*kx*x, dtype = complex)+Psip*np.exp(-1j*kx*x, dtype = complex))
