@@ -23,6 +23,7 @@ import scipy.constants as sc
 
 #%% Waveguide class
 class Waveguide:
+    '''Defining waveguide dimensions and material properties'''
     def __init__(self, a, b, zz, zt, sigma):
         self.a = a
         self.b = b
@@ -165,6 +166,9 @@ plt.show()
 #%% Fields computation
 # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
 class Fields:
+    '''Computing fields in the waveguide with mode theory and analytically. 
+    Computation of dissipation factor (alpha)'''
+
     def __init__(self, waveguide, dispersionCurve, Nx, Ny):
         self.waveguide = waveguide
         self.dispersionCurve = dispersionCurve
@@ -194,6 +198,10 @@ class Fields:
         self.Hx = None
         self.Hy = None
         self.Hz = None
+
+        # Surface resistance
+        self.R_surf = None
+        self.alpha_att = None
 
     def compute_params(self):
 
@@ -290,7 +298,100 @@ class Fields:
             
             self.Hx = -self.Ey*k0/gamma_/Z0
             self.Hy = self.Ex*k0/gamma_/Z0
-            
+
+    def compute_alpha(self):
+        # This is the version that benchmarks the idea of splitting the integrals
+        omega = 2*np.pi*self.dispersionCurve.freq
+    
+        # Power flow integral
+        integrand = self.Ex*np.conjugate(self.Hy) - self.Ey*np.conjugate(self.Hx)
+
+        # The integral is fone as a simple sum
+        Pnm = 1/2*np.real(np.sum(np.sum(integrand*self.waveguide.a*self.waveguide.b/self.Nx/self.Ny)))
+        
+        # Computing one current density for every side of the waveguide
+        
+        # Fields and currents for x = 0, normal is [-1, 0, 0]
+        n = np.array([-1, 0, 0])
+        H_xe0 = np.array([self.Hx[:,0], self.Hy[:,0], self.Hz[:,0]])
+
+        J_xe0 = []
+        for idx, el in enumerate(self.Hx[:,0]):
+            J_xe0.append(np.cross(n, H_xe0[:,idx]))
+        J_xe0 = np.array(J_xe0)
+
+        # Fields and currents for x = a, normal is [1, 0, 0]
+        n = np.array([1, 0, 0])
+        H_xea = np.array([self.Hx[:,-1], self.Hy[:,-1], self.Hz[:,-1]])
+
+        J_xea = []
+
+        for idx, el in enumerate(self.Hx[:,0]):
+            J_xea.append(np.cross(n, H_xea[:,idx]))
+        J_xea = np.array(J_xea)
+
+        # Fields and currents for y = 0, normal is [0, -1, 0]
+        n = np.array([0, -1, 0])
+        H_ye0 = np.array([self.Hx[0,:], self.Hy[0,:], self.Hz[0,:]])
+
+        J_ye0 = []
+
+        for idx, el in enumerate(self.Hx[:,0]):
+            J_ye0.append(np.cross(n, H_ye0[:,idx]))
+        J_ye0 = np.array(J_ye0)
+
+        # Fields and currents for y = b, normal is [0, 1, 0]
+        n = np.array([0, 1, 0])
+        H_yeb = np.array([self.Hx[-1,:], self.Hy[-1,:], self.Hz[-1,:]])
+
+        J_yeb = []
+
+        for idx, el in enumerate(Hx[:,0]):
+            J_yeb.append(np.cross(n, H_yeb[:,idx]))
+        J_yeb = np.array(J_yeb)
+        
+        # Now we compute the losses
+        # Resistance of the metal walls
+        self.R_surf = np.sqrt(omega*sc.mu_0/2/self.waveguide.sigma)
+        Rzz = np.real(self.waveguide.zz)
+        Rzt = np.real(self.waveguide.zt)
+
+        int1 = []
+        for idx, el in enumerate(J_xe0[:,0]):
+            int1.append(np.dot(J_xe0[idx], np.conjugate(J_xe0[idx]))*self.waveguide.b/self.Ny)
+        Pl1 = self.R_surf/2*np.sum(int1)
+
+        int2 = []
+        for idx, el in enumerate(J_xea[:,0]):
+            int2.append(np.dot(J_xea[idx], np.conjugate(J_xea[idx]))*self.waveguide.b/self.Ny)
+        Pl2 = self.R_surf/2*np.sum(int2)
+
+        int3 = []
+        for idx, el in enumerate(J_ye0[:,0]):
+            int3.append(np.dot(J_ye0[idx], np.conjugate(J_ye0[idx]))*self.waveguide.a/self.Nx)
+        Pl3 = self.R_surf/2*np.sum(int3)
+
+        # Testing on int 4 the separation of the components, this should be done
+        # on the vertical walls...
+        int4z = []
+        int4t = []
+        for idx, el in enumerate(J_yeb[:,0]):
+            Pl4t = np.dot(J_yeb[idx,0], np.conjugate(J_yeb[idx,0]))*self.waveguide.a/self.Nx
+            Pl4z = np.dot(J_yeb[idx,2], np.conjugate(J_yeb[idx,2]))*self.waveguide.a/self.Nx
+
+            int4z.append(Pl4z)
+            int4t.append(Pl4t)
+        Pl4 = self.R_surf/2*np.sum(int4z) + self.R_surf/2*np.sum(int4t) # Per ora è isotropa
+
+        Pl = Pl1+Pl2+Pl3+Pl4
+        
+        # This is alpha in dB
+        self.alpha_att = Pl/2/Pnm * 8.686
+        
+        # Just for visualization
+        if np.abs(self.alpha_att) > 10:
+            self.alpha_att = np.nan
+        
     
 #%% Testing field maps
 # Create a subplot with contourf
@@ -306,15 +407,18 @@ WR90 = Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
 Dispersion_WR90 = DispersionCurve(waveguide=WR90, m=0, n=1, freq=freq)
 Fields_WR90 = Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
 Fields_WR90.compute_fields_analytical(mode='TE')
+Fields_WR90.compute_fields()
 
 A = [Fields_WR90.Ex, Fields_WR90.Ey, Fields_WR90.Ez, 
      Fields_WR90.Hx, Fields_WR90.Hy, Fields_WR90.Hz]
+
+norm_factor = np.amax(np.amax(np.abs(A)))
 
 for idx, el in enumerate(labels):
     row = idx // 3  # Determine the row (0 or 1)
     col = idx % 3   # Determine the column (0, 1, or 2)
 
-    contour = ax[row, col].contourf(Fields_WR90.x, Fields_WR90.y, np.abs(A[idx]), cmap='viridis', levels=100)
+    contour = ax[row, col].contourf(Fields_WR90.x, Fields_WR90.y, np.imag(A[idx])/norm_factor, cmap='viridis', levels=100)
     fig.colorbar(contour, ax=ax[row, col])
 
     # Add labels and title
@@ -330,7 +434,6 @@ fig.suptitle(f'TE{1}{0}, WR90', fontsize=16)
 # Show the plot
 plt.tight_layout()
 plt.show()
-
 
 #%% Mode checking example
 """
@@ -432,205 +535,6 @@ fig.suptitle(f'TE{n}{m} diff, WR90', fontsize=16)
 # Show the plot
 plt.tight_layout()
 plt.show()
-
-#%% Computation of alpha
-
-# This is the version that benchmarks the idea of splitting the integrals
-def alpha(a, b, zz, zt, m, n, freq, sigma):
-    # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
-    # Here we follow [Benedikt Byrne. “Etude et conception de guides d’onde et 
-# d’antennes cornets `a m ́etamat ́eriaux”. PhD thesis. Nov. 2016. url: https://oatao.univ-toulouse.fr/172 [Byr16]
-
-    omega = 2*np.pi*freq
-    
-    [Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=freq)[0]
-    #[Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields_a(a=a, b=b, m=m, n=n, freq=freq, flag="TE")[0]
-    # Power flow integral
-    integrand = Ex*np.conjugate(Hy) - Ey*np.conjugate(Hx)
-    # The integral you can do it as a simple sum
-    Pnm = 1/2*np.real(np.sum(np.sum(integrand*a*b/100/100)))
-    # I now need four currents, one for every side of the waveguide
-    
-    # Fields and currents for x = 0, normal is [-1, 0, 0]
-    n = np.array([-1, 0, 0])
-    H_xe0 = np.array([Hx[:,0], Hy[:,0], Hz[:,0]])
-
-    J_xe0 = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_xe0.append(np.cross(n, H_xe0[:,idx]))
-
-    J_xe0 = np.array(J_xe0)
-
-    # Fields and currents for x = a, normal is [1, 0, 0]
-    n = np.array([1, 0, 0])
-    H_xea = np.array([Hx[:,-1], Hy[:,-1], Hz[:,-1]])
-
-    J_xea = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_xea.append(np.cross(n, H_xea[:,idx]))
-
-    J_xea = np.array(J_xea)
-
-    # Fields and currents for y = 0, normal is [0, -1, 0]
-    n = np.array([0, -1, 0])
-    H_ye0 = np.array([Hx[0,:], Hy[0,:], Hz[0,:]])
-
-    J_ye0 = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_ye0.append(np.cross(n, H_ye0[:,idx]))
-
-    J_ye0 = np.array(J_ye0)
-
-    # Fields and currents for y = b, normal is [0, 1, 0]
-    n = np.array([0, 1, 0])
-    H_yeb = np.array([Hx[-1,:], Hy[-1,:], Hz[-1,:]])
-
-    J_yeb = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_yeb.append(np.cross(n, H_yeb[:,idx]))
-
-    J_yeb = np.array(J_yeb)
-    
-    # Now we compute the losses
-    # Resistance of the metal walls
-    Rm = np.sqrt(omega*sc.mu_0/2/sigma)
-    Rzz = np.real(zz)
-    Rzt = np.real(zt)
-
-    int1 = []
-    for idx, el in enumerate(J_xe0[:,0]):
-        int1.append(np.dot(J_xe0[idx], np.conjugate(J_xe0[idx]))*b/100)
-    Pl1 = Rm/2*np.sum(int1)
-
-    int2 = []
-    for idx, el in enumerate(J_xea[:,0]):
-        int2.append(np.dot(J_xea[idx], np.conjugate(J_xea[idx]))*b/100)
-    Pl2 = Rm/2*np.sum(int2)
-
-    int3 = []
-    for idx, el in enumerate(J_ye0[:,0]):
-        int3.append(np.dot(J_ye0[idx], np.conjugate(J_ye0[idx]))*a/100)
-    Pl3 = Rm/2*np.sum(int3)
-
-    int4z = []
-    int4t = []
-    for idx, el in enumerate(J_yeb[:,0]):
-        Pl4t = np.dot(J_yeb[idx,0], np.conjugate(J_yeb[idx,0]))*a/100
-        Pl4z = np.dot(J_yeb[idx,2], np.conjugate(J_yeb[idx,2]))*a/100
-        int4z.append(Pl4z)
-        int4t.append(Pl4t)
-    Pl4 = Rm/2*np.sum(int4z) + Rm/2*np.sum(int4t) # Per ora è isotropa
-
-    Pl = Pl1+Pl2+Pl3+Pl4
-    
-    # This is alpha in dB
-    alpha = Pl/2/Pnm * 8.686
-    if np.abs(alpha) > 10:
-        alpha = np.nan
-    
-    return alpha
-
-#%%
-def alpha_a(a, b, zz, zt, m, n, freq, sigma):
-    # To solve the system of equation in [Byr16, Eq. 2.91] we need to:
-    # Here we follow [Benedikt Byrne. “Etude et conception de guides d’onde et 
-# d’antennes cornets `a m ́etamat ́eriaux”. PhD thesis. Nov. 2016. url: https://oatao.univ-toulouse.fr/172 [Byr16]
-
-    omega = 2*np.pi*freq
-    
-    #[Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=freq)[0]
-    [Ex, Ey, Ez, Hx, Hy, Hz] = compute_fields_a(a=a, b=b, m=m, n=n, freq=freq, flag="TE")[0]
-    # Power flow integral
-    integrand = Ex*np.conjugate(Hy) - Ey*np.conjugate(Hx)
-    # The integral you can do it as a simple sum
-    Pnm = 1/2*np.real(np.sum(np.sum(integrand*a*b/100/100)))
-    # I now need four currents, one for every side of the waveguide
-    
-    # Fields and currents for x = 0, normal is [-1, 0, 0]
-    n = np.array([-1, 0, 0])
-    H_xe0 = np.array([Hx[:,0], Hy[:,0], Hz[:,0]])
-
-    J_xe0 = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_xe0.append(np.cross(n, H_xe0[:,idx]))
-
-    J_xe0 = np.array(J_xe0)
-
-    # Fields and currents for x = a, normal is [1, 0, 0]
-    n = np.array([1, 0, 0])
-    H_xea = np.array([Hx[:,-1], Hy[:,-1], Hz[:,-1]])
-
-    J_xea = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_xea.append(np.cross(n, H_xea[:,idx]))
-
-    J_xea = np.array(J_xea)
-
-    # Fields and currents for y = 0, normal is [0, -1, 0]
-    n = np.array([0, -1, 0])
-    H_ye0 = np.array([Hx[0,:], Hy[0,:], Hz[0,:]])
-
-    J_ye0 = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_ye0.append(np.cross(n, H_ye0[:,idx]))
-
-    J_ye0 = np.array(J_ye0)
-
-    # Fields and currents for y = b, normal is [0, 1, 0]
-    n = np.array([0, 1, 0])
-    H_yeb = np.array([Hx[-1,:], Hy[-1,:], Hz[-1,:]])
-
-    J_yeb = []
-
-    for idx, el in enumerate(Hx[:,0]):
-        J_yeb.append(np.cross(n, H_yeb[:,idx]))
-
-    J_yeb = np.array(J_yeb)
-    
-    # Now we compute the losses
-    # Resistance of the metal walls
-    Rm = np.sqrt(omega*sc.mu_0/2/sigma)
-    Rzz = np.real(zz)
-    Rzt = np.real(zt)
-
-    int1 = []
-    for idx, el in enumerate(J_xe0[:,0]):
-        int1.append(np.dot(J_xe0[idx], np.conjugate(J_xe0[idx]))*b/100)
-    Pl1 = Rm/2*np.sum(int1)
-
-    int2 = []
-    for idx, el in enumerate(J_xea[:,0]):
-        int2.append(np.dot(J_xea[idx], np.conjugate(J_xea[idx]))*b/100)
-    Pl2 = Rm/2*np.sum(int2)
-
-    int3 = []
-    for idx, el in enumerate(J_ye0[:,0]):
-        int3.append(np.dot(J_ye0[idx], np.conjugate(J_ye0[idx]))*a/100)
-    Pl3 = Rm/2*np.sum(int3)
-
-    int4z = []
-    int4t = []
-    for idx, el in enumerate(J_yeb[:,0]):
-        Pl4t = np.dot(J_yeb[idx,0], np.conjugate(J_yeb[idx,0]))*a/100
-        Pl4z = np.dot(J_yeb[idx,2], np.conjugate(J_yeb[idx,2]))*a/100
-        int4z.append(Pl4z)
-        int4t.append(Pl4t)
-    Pl4 = Rm/2*np.sum(int4z) + Rm/2*np.sum(int4t) # Per ora è isotropa
-
-    Pl = Pl1+Pl2+Pl3+Pl4
-    
-    # This is alpha in dB
-    alpha = Pl/2/Pnm * 8.686
-
-    return alpha
-
 
 #%% Benchmark with multiple modes
 
