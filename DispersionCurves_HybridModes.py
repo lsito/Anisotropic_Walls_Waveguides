@@ -300,6 +300,12 @@ class Fields:
             self.Hy = self.Ex*k0/gamma_/Z0
 
     def compute_alpha(self):
+
+        """
+        if self.Ex == None:
+            compute_fields()
+        """
+
         # This is the version that benchmarks the idea of splitting the integrals
         omega = 2*np.pi*self.dispersionCurve.freq
     
@@ -538,10 +544,12 @@ plt.show()
 
 #%% Benchmark with multiple modes
 
-fig, ax = plt.subplots(figsize=(4, 2))
+a=22.86e-3
+b=10.16e-3
+
+WR90 = Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
 
 modes = [[1,0], [2,0], [1,1], [0,1]]
-#modes = [[1,0]]
 
 for mode in modes:
     m = mode[1]
@@ -550,15 +558,7 @@ for mode in modes:
     alphadB = []
     alphadB_a = []
     
-    frequencies = np.linspace(7e9, 30e9, 100)
-    
-    # The waveguide (WR90)
-    a = 22.86e-3 # Long side of waveguide
-    b = 10.16e-3 # Short side of waveguide
-    sigma = 5.8e7 
-    Rm_ = []
-    zt = 0
-    zz = 0
+    freq = np.geomspace(1e6, 3e10, 501)
     
     # For the analytical expression
     ky= m*np.pi/b
