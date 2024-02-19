@@ -171,6 +171,12 @@ class Fields:
         self.Nx = Nx
         self.Ny = Ny
 
+        # Meshgrid
+        x_values = np.linspace(0, self.waveguide.a, self.Nx)  
+        y_values = np.linspace(0, self.waveguide.b, self.Ny)
+        self.x, self.y = np.meshgrid(x_values, y_values)
+
+        # Params
         self.Gammap = None 
         self.Gammam = None 
         self.Pisp = None
@@ -180,6 +186,14 @@ class Fields:
         self.beta = None
 
         self.compute_params()
+        
+        # Fields
+        self.Ex = None
+        self.Ey = None
+        self.Ez = None
+        self.Hx = None
+        self.Hy = None
+        self.Hz = None
 
     def compute_params(self):
 
@@ -189,10 +203,12 @@ class Fields:
         Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
         X = np.exp(-1j*2*kx*self.waveguide.a, dtype = complex)
         
+        # For better readability of the matrix
         gamma = self.dispersionCurve.gamma
         zt = self.waveguide.zt
         zz = self.waveguide.zz
         kc = self.dispersionCurve.kc
+        k0 = self.dispersionCurve.k0
 
         # 1. Build the matrix
         M = np.array([[gamma*ky, gamma*ky, zt*Z0*kc**2-Z0*k0*kx, zt*Z0*kc**2+Z0*k0*kx],
@@ -215,40 +231,66 @@ class Fields:
         except ZeroDivisionError:
             self.beta = float('inf')
     
-    # Compute all the fields:
-    # We still need the dependace from z
-    def compute_fields(x, y):
+    # Compute all the fields: we still need the dependace from z
+    def compute_fields(self):
+
+        ky = self.dispersionCurve.m*np.pi/self.waveguide.b
+        kx = np.sqrt(self.dispersionCurve.kc**2-ky**2, dtype = complex)
+
+        Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
+        X = np.exp(-1j*2*kx*self.waveguide.a, dtype = complex)
+
+        # For better readability
+        gamma = self.dispersionCurve.gamma
+        kc = self.dispersionCurve.kc
+        k0 = self.dispersionCurve.k0
+
         # Supporting pieces
-        Ap = (Gammam*np.exp(1j*kx*x, dtype = complex)+Gammap*np.exp(-1j*kx*x, dtype = complex))
-        Bp = (Psim*np.exp(1j*kx*x, dtype = complex)+Psip*np.exp(-1j*kx*x, dtype = complex))
-        Am = (Gammam*np.exp(1j*kx*x, dtype = complex)-Gammap*np.exp(-1j*kx*x, dtype = complex))
-        Bm = (Psim*np.exp(1j*kx*x, dtype = complex)-Psip*np.exp(-1j*kx*x, dtype = complex))    
+        Ap = (self.Gammam*np.exp(1j*kx*self.x, dtype = complex)+self.Gammap*np.exp(-1j*kx*self.x, dtype = complex))
+        Bp = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)+self.Psip*np.exp(-1j*kx*self.x, dtype = complex))
+        Am = (self.Gammam*np.exp(1j*kx*self.x, dtype = complex)-self.Gammap*np.exp(-1j*kx*self.x, dtype = complex))
+        Bm = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)-self.Psip*np.exp(-1j*kx*self.x, dtype = complex))    
     
-        Ex = -1j*(gamma*kx*Am-Z0*k0*ky*Bp)*np.sin(ky*y)/(kc**2)
-        Ey = -(gamma*ky*Ap+Z0*k0*kx*Bm)*np.cos(ky*y)/(kc**2)
-        Ez = Ap*np.sin(ky*y)
+        self.Ex = -1j*(gamma*kx*Am-Z0*k0*ky*Bp)*np.sin(ky*self.y)/(kc**2)
+        self.Ey = -(gamma*ky*Ap+Z0*k0*kx*Bm)*np.cos(ky*self.y)/(kc**2)
+        self.Ez = Ap*np.sin(ky*self.y)
     
-        Hx = -1j*(-k0*ky*Ap+Z0*gamma*kx*Bm)*np.cos(ky*y)/(Z0*kc**2)
-        Hy = (k0*kx*Am+Z0*gamma*ky*Bp)*np.sin(ky*y)/(Z0*kc**2)
-        Hz = Bp*np.cos(ky*y)
+        self.Hx = -1j*(-k0*ky*Ap+Z0*gamma*kx*Bm)*np.cos(ky*self.y)/(Z0*kc**2)
+        self.Hy = (k0*kx*Am+Z0*gamma*ky*Bp)*np.sin(ky*self.y)/(Z0*kc**2)
+        self.Hz = Bp*np.cos(ky*self.y)
     
-        return [Ex, Ey, Ez, Hx, Hy, Hz]
-    
-    if flag==True:
-        # Generate a grid of x and y values
-        x_values = np.linspace(0, a, 100)  # 100 points between 0 and a
-        y_values = np.linspace(0, b, 100)  # 100 points between 0 and b
+    # Compute all the fields only for fully metal waveguides
+    def compute_fields_analytical(self, mode='TE'):
         
-        # Create a meshgrid from x and y values
-        x_mesh, y_mesh = np.meshgrid(x_values, y_values)
-        
-        # Evaluate the function for each combination of x and y
-        fields = compute(x_mesh, y_mesh)
-        mesh = [x_values, y_values]
+        ky = self.dispersionCurve.m*np.pi/self.waveguide.b
+        kx = self.dispersionCurve.n*np.pi/self.waveguide.a
     
-        return [fields, mesh, alpha, beta]
-    else:
-        return [alpha, beta]
+        k0 = 2*np.pi*self.dispersionCurve.freq*np.sqrt(sc.epsilon_0*sc.mu_0)
+        kc = np.sqrt(kx**2 + ky**2)
+        
+        gamma_ = np.sqrt(k0**2 - kc**2, dtype=complex)
+        Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
+        
+        if mode=='TE':
+            self.Hz = np.cos(kx*self.x)*np.cos(ky*self.y)
+            self.Ez = 0*self.x*self.y
+            
+            self.Hx = 1j*gamma_*kx/kc**2*np.sin(kx*self.x)*np.cos(ky*self.y)
+            self.Hy = 1j*gamma_*ky/kc**2*np.cos(kx*self.x)*np.sin(ky*self.y)
+            
+            self.Ex = k0/gamma_*Z0*self.Hy
+            self.Ey = -k0/gamma_*Z0*self.Hx
+            
+        elif mode=='TM':    
+            self.Hz = 0*self.x*self.y
+            self.Ez = np.sin(kx*self.x)*np.sin(ky*self.y)
+            
+            self.Ex = 1j*gamma_*kx/kc**2*np.cos(kx*self.x)*np.sin(ky*self.y)
+            self.Ey = 1j*gamma_*ky/kc**2*np.sin(kx*self.x)*np.cos(ky*self.y)
+            
+            self.Hx = -self.Ey*k0/gamma_/Z0
+            self.Hy = self.Ex*k0/gamma_/Z0
+            
     
 #%% Testing field maps
 # Create a subplot with contourf
@@ -256,14 +298,23 @@ fig, ax = plt.subplots(2,3, figsize=(10, 5))
 
 labels = ["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"]
 
-freq = 10e9
-A = compute_fields(a=a, b=b, zz=0, zt=0, m=1, n=0, freq=15e9)
+freq = 15e9
+a=22.86e-3
+b=10.16e-3
+
+WR90 = Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
+Dispersion_WR90 = DispersionCurve(waveguide=WR90, m=0, n=1, freq=freq)
+Fields_WR90 = Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
+Fields_WR90.compute_fields_analytical(mode='TE')
+
+A = [Fields_WR90.Ex, Fields_WR90.Ey, Fields_WR90.Ez, 
+     Fields_WR90.Hx, Fields_WR90.Hy, Fields_WR90.Hz]
 
 for idx, el in enumerate(labels):
     row = idx // 3  # Determine the row (0 or 1)
     col = idx % 3   # Determine the column (0, 1, or 2)
 
-    contour = ax[row, col].contourf(A[1][0], A[1][1], np.imag(A[0][idx])/np.real(A[0][idx]), cmap='viridis', levels=100)
+    contour = ax[row, col].contourf(Fields_WR90.x, Fields_WR90.y, np.abs(A[idx]), cmap='viridis', levels=100)
     fig.colorbar(contour, ax=ax[row, col])
 
     # Add labels and title
@@ -274,15 +325,15 @@ for idx, el in enumerate(labels):
     ax[row, col].set_aspect('equal')
 
 # Set a title for the whole figure
-fig.suptitle(f'TE{n}{m}, WR90', fontsize=16)
+fig.suptitle(f'TE{1}{0}, WR90', fontsize=16)
 
 # Show the plot
 plt.tight_layout()
 plt.show()
 
-"""
-#%% Mode checking example
 
+#%% Mode checking example
+"""
 m = 0
 n = 1 # nth zero of f(kc)
 
@@ -317,61 +368,7 @@ plt.show()
 # Check all modes now (all, go up to some orders)
 """
 
-#%% The analytical dispersion equation for a rectangular waveguide
-
-def compute_fields_a(a, b, m, n, freq, flag):
-
-    ky= m*np.pi/b
-    kx= n*np.pi/a
-    
-    k0 = 2*np.pi*freq*np.sqrt(sc.epsilon_0*sc.mu_0)
-    kc = np.sqrt(kx**2 + ky**2)
-    
-    gamma_ = np.sqrt(k0**2 - kc**2, dtype=complex)
-    Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
-    
-    def compute_fieldsTE(x,y):
-        
-        HzTE = np.cos(kx*x)*np.cos(ky*y)
-        EzTE = 0*x*y
-        
-        HxTE = 1j*gamma_*kx/kc**2*np.sin(kx*x)*np.cos(ky*y)
-        HyTE = 1j*gamma_*ky/kc**2*np.cos(kx*x)*np.sin(ky*y)
-        
-        ExTE = k0/gamma_*Z0*HyTE
-        EyTE = -k0/gamma_*Z0*HxTE
-        
-        return [ExTE, EyTE, EzTE, HxTE, HyTE, HzTE]
-        
-    def compute_fieldsTM(x,y):
-        
-        HzTM = 0*x*y
-        EzTM = np.sin(kx*x)*np.sin(ky*y)
-        
-        ExTM = 1j*gamma_*kx/kc**2*np.cos(kx*x)*np.sin(ky*y)
-        EyTM = 1j*gamma_*ky/kc**2*np.sin(kx*x)*np.cos(ky*y)
-        
-        HxTM = -EyTM*k0/gamma_/Z0
-        HyTM = ExTM*k0/gamma_/Z0
-        
-        return [ExTM, EyTM, EzTM, HxTM, HyTM, HzTM]
-    
-    # Generate a grid of x and y values
-    x_values = np.linspace(0, a, 100)  # 100 points between 0 and a
-    y_values = np.linspace(0, b, 100)  # 100 points between 0 and b
-    
-    # Create a meshgrid from x and y values
-    x_mesh, y_mesh = np.meshgrid(x_values, y_values)
-    
-    # Evaluate the function for each combination of x and y
-    if flag=="TE":
-        fields = compute_fieldsTE(x_mesh, y_mesh)
-    else:
-        fields = compute_fieldsTM(x_mesh, y_mesh)
-    
-    mesh = [x_values, y_values]
-    return [fields, mesh]
-
+#%% Plot
 # Create a subplot with contourf
 fig, ax = plt.subplots(2,3, figsize=(10, 5))
 
