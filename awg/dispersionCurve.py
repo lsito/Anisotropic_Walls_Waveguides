@@ -1,4 +1,4 @@
-from .waveguide import Waveguide 
+from awg.waveguide import Waveguide 
 
 import numpy as np
 

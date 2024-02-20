@@ -73,4 +73,3 @@ for mode in modes:
     
 plt.show()
 
-# %%

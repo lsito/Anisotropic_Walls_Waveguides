@@ -1,5 +1,12 @@
-from .waveguide import Waveguide 
-from .dispersionCurve import DispersionCurve
+from awg.waveguide import Waveguide 
+from awg.dispersionCurve import DispersionCurve
+
+import numpy as np
+
+from scipy.optimize import fsolve
+from scipy.signal import find_peaks
+import scipy.constants as sc
+
 
 class Fields:
     '''Computing fields in the waveguide with mode theory and analytically. 
