@@ -1,4 +1,4 @@
-import waveguide
+from .waveguide import Waveguide 
 
 import numpy as np
 
@@ -70,14 +70,14 @@ class DispersionCurve:
             roots_idx = find_peaks(-f_of_kc_me0(x, self.freq))[0]
             
             roots = x[roots_idx]
-            kc = roots[n-1] # Because there is no TEM
+            kc = roots[self.n-1] # Because there is no TEM
             
         else:
             x = np.linspace(1, 600, 10000) # Hard coded, not nice!
             roots_idx = find_peaks(-f_of_kc_mne0(x, self.m, self.freq))[0]
             
             roots = x[roots_idx]
-            kc = roots[n]
+            kc = roots[self.n]
         
         return kc
         

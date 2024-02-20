@@ -1,6 +1,5 @@
-import waveguide
-import dispersionCurve
-
+from .waveguide import Waveguide 
+from .dispersionCurve import DispersionCurve
 
 class Fields:
     '''Computing fields in the waveguide with mode theory and analytically. 
