@@ -8,4 +8,4 @@ from .waveguide import Waveguide
 from .dispersionCurve import DispersionCurve
 from .fields import Fields
 
-print('AWG v' + __version__)
+print('ANWG v' + __version__)

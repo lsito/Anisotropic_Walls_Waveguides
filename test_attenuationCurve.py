@@ -1,5 +1,5 @@
 #%% Import packages
-import awg # My package
+import anwg # My package
 
 import numpy as np
 import matplotlib as mpl
@@ -18,7 +18,7 @@ fig, ax = plt.subplots()
 a=22.86e-3
 b=10.16e-3
 
-WR90 = awg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
+WR90 = anwg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
 
 modes = [[1,0], [2,0], [1,1], [0,1]]
 
@@ -41,8 +41,8 @@ for mode in modes:
     for el in freq: 
         #alphadB.append(alpha(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
 
-        Dispersion_WR90 = awg.DispersionCurve(waveguide=WR90, m=m, n=n, freq=el)
-        Fields_WR90 = awg.Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
+        Dispersion_WR90 = anwg.DispersionCurve(waveguide=WR90, m=m, n=n, freq=el)
+        Fields_WR90 = anwg.Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
         
         Fields_WR90.compute_fields()
         Fields_WR90.compute_alpha()

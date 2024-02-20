@@ -1,5 +1,5 @@
-from awg.waveguide import Waveguide 
-from awg.dispersionCurve import DispersionCurve
+from anwg.waveguide import Waveguide 
+from anwg.dispersionCurve import DispersionCurve
 
 import numpy as np
 

@@ -1,5 +1,5 @@
 #%% Import packages
-import awg # My package
+import anwg # My package
 
 import numpy as np
 import matplotlib as mpl
@@ -21,7 +21,7 @@ a=22.86e-3
 b=10.16e-3
 
 # We define a simple copper waveguide
-WR90 = awg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
+WR90 = anwg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
 
 # We want to check a number of modes
 modes = [[1,0], [2,0], [0,1], [1,1], [3,0], [2,1]]
@@ -41,7 +41,7 @@ for mode in modes:
     
     # Sweep on all frequency points
     for idx, el in enumerate(freq):
-        dispCurveParams = awg.DispersionCurve(WR90, m=m, n=n, freq=el)
+        dispCurveParams = anwg.DispersionCurve(WR90, m=m, n=n, freq=el)
 
         k0[idx] = dispCurveParams.k0
         kc[idx] = dispCurveParams.kc
@@ -73,3 +73,5 @@ for mode in modes:
     
 plt.show()
 
+
+# %%

@@ -1,5 +1,5 @@
 #%% Import packages
-import awg # My package
+import anwg # My package
 
 import numpy as np
 import matplotlib as mpl
@@ -22,9 +22,9 @@ freq = 15e9
 a=22.86e-3
 b=10.16e-3
 
-WR90 = awg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
-Dispersion_WR90 = awg.DispersionCurve(waveguide=WR90, m=0, n=1, freq=freq)
-Fields_WR90 = awg.Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
+WR90 = anwg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
+Dispersion_WR90 = anwg.DispersionCurve(waveguide=WR90, m=0, n=1, freq=freq)
+Fields_WR90 = anwg.Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
 Fields_WR90.compute_fields_analytical(mode='TE')
 Fields_WR90.compute_fields()
 
