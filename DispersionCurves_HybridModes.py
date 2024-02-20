@@ -352,7 +352,7 @@ class Fields:
 
         J_yeb = []
 
-        for idx, el in enumerate(Hx[:,0]):
+        for idx, el in enumerate(self.Hx[:,0]):
             J_yeb.append(np.cross(n, H_yeb[:,idx]))
         J_yeb = np.array(J_yeb)
         
@@ -544,6 +544,8 @@ plt.show()
 
 #%% Benchmark with multiple modes
 
+fig, ax = plt.subplots()
+
 a=22.86e-3
 b=10.16e-3
 
@@ -557,6 +559,7 @@ for mode in modes:
 
     alphadB = []
     alphadB_a = []
+    Rm = []
     
     freq = np.geomspace(1e6, 3e10, 501)
     
@@ -566,28 +569,37 @@ for mode in modes:
     kc = np.sqrt(kx**2 + ky**2)
     Z0 = np.sqrt(sc.mu_0/sc.epsilon_0)
     
-    for el in frequencies:
+    for el in freq: 
         #alphadB.append(alpha(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
-        alphadB.append(alpha(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
+
+        Dispersion_WR90 = DispersionCurve(waveguide=WR90, m=m, n=n, freq=el)
+        Fields_WR90 = Fields(waveguide=WR90, dispersionCurve=Dispersion_WR90, Nx=100, Ny=100)
+        
+        Fields_WR90.compute_fields()
+        Fields_WR90.compute_alpha()
+
+        alphadB.append(Fields_WR90.alpha_att)
             
         k0 = 2*np.pi*el*np.sqrt(sc.epsilon_0*sc.mu_0)
         
-        Rm = np.sqrt(2*np.pi*el*sc.mu_0/2/sigma)
-        Rm_.append(Rm)
+        Rm.append(Fields_WR90.R_surf)
+
         if m == 0 or n==0:
-            app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+b/a*(1/2-kc**2/k0**2)*(n**2*a*b+m**2*a**2)/(n**2*b**2+m**2*a**2))
+            app = 2*Fields_WR90.R_surf/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+b/a*(1/2-kc**2/k0**2)*(n**2*a*b+m**2*a**2)/(n**2*b**2+m**2*a**2))
             #app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*(1/2+b/a*kc**2/k0**2)
         else:
-            app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+b/a*(1-kc**2/k0**2)*(n**2*a*b+m**2*a**2)/(n**2*b**2+m**2*a**2))
+            app = 2*Fields_WR90.R_surf/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+b/a*(1-kc**2/k0**2)*(n**2*a*b+m**2*a**2)/(n**2*b**2+m**2*a**2))
             #app = 2*Rm/(b*Z0*np.sqrt(1-kc**2/k0**2))*((1+b/a)*kc**2/k0**2+(1-kc**2/k0**2)*(m**2*b**2+n**2*a*b)/(n**2*a**2+m**2*b**2))
             
         alphadB_a.append(app*8.686)
         # alphadB_a.append(alpha_a(a=a, b=b, zz=zz, zt=zt, m=m, n=n, freq=el, sigma=sigma))
         
-    ax.plot(frequencies, alphadB, label = f"TE{n}{m} numerical")
-    ax.plot(frequencies, alphadB_a, label = f"TE{n}{m}   analytical")
+    ax.plot(freq, alphadB, label = f"TE{n}{m} numerical")
+    ax.plot(freq, alphadB_a, label = f"TE{n}{m}   analytical")
     # ax.plot(frequencies, Rm_, label = f"TE{n}{m} numerical")
     
     plt.legend()
 #ax.set_ylim(0, 0.4)   
 ax.grid(True)
+
+# %%
