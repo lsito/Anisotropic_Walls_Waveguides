@@ -97,11 +97,11 @@ class Fields:
         k0 = self.dispersionCurve.k0
 
         # Supporting pieces
-        Ap = (self.Gammam*np.exp(-1j*kx*self.x, dtype = complex)+self.Gammap*np.exp(1j*kx*self.x, dtype = complex))
-        Bp = (self.Psim*np.exp(-1j*kx*self.x, dtype = complex)+self.Psip*np.exp(1j*kx*self.x, dtype = complex))
-        Am = (self.Gammam*np.exp(-1j*kx*self.x, dtype = complex)-self.Gammap*np.exp(1j*kx*self.x, dtype = complex))
-        Bm = (self.Psim*np.exp(-1j*kx*self.x, dtype = complex)-self.Psip*np.exp(1j*kx*self.x, dtype = complex))    
-    
+        Ap = (self.Gammam*np.exp(1j*kx*self.x, dtype = complex)+self.Gammap*np.exp(-1j*kx*self.x, dtype = complex))
+        Bp = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)+self.Psip*np.exp(-1j*kx*self.x, dtype = complex))
+        Am = (self.Gammam*np.exp(1j*kx*self.x, dtype = complex)-self.Gammap*np.exp(-1j*kx*self.x, dtype = complex))
+        Bm = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)-self.Psip*np.exp(-1j*kx*self.x, dtype = complex))    
+        
         self.Ex = -1j*(gamma*kx*Am-Z0*k0*ky*Bp)*np.sin(ky*self.y)/(kc**2)
         self.Ey = -(gamma*ky*Ap+Z0*k0*kx*Bm)*np.cos(ky*self.y)/(kc**2)
         self.Ez = Ap*np.sin(ky*self.y)
