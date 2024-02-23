@@ -97,8 +97,9 @@ class Fields:
         k0 = self.dispersionCurve.k0
 
         # Supporting pieces
+        
         Ap = (self.Gammam*np.exp(1j*kx*self.x, dtype = complex)+self.Gammap*np.exp(-1j*kx*self.x, dtype = complex))
-        Bp = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)+self.Psip*np.exp(-1j*kx*self.x, dtype = complex))
+        Bp = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)+self.Psip*np.exp(-1j*kx*self.x, dtype = complex)) 
         Am = (self.Gammam*np.exp(1j*kx*self.x, dtype = complex)-self.Gammap*np.exp(-1j*kx*self.x, dtype = complex))
         Bm = (self.Psim*np.exp(1j*kx*self.x, dtype = complex)-self.Psip*np.exp(-1j*kx*self.x, dtype = complex))    
     

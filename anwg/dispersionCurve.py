@@ -66,14 +66,14 @@ class DispersionCurve:
                 return f
             
         if self.m == 0:
-            x = np.linspace(1, 1000, 10000) # Hard coded, not nice!
+            x = np.linspace(1, 1000, 100000) # Hard coded, not nice!
             roots_idx = find_peaks(-f_of_kc_me0(x, self.freq))[0]
             
             roots = x[roots_idx]
             kc = roots[self.n-1] # Because there is no TEM
             
         else:
-            x = np.linspace(1, 600, 10000) # Hard coded, not nice!
+            x = np.linspace(1, 600, 100000) # Hard coded, not nice!
             roots_idx = find_peaks(-f_of_kc_mne0(x, self.m, self.freq))[0]
             
             roots = x[roots_idx]

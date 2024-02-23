@@ -31,7 +31,7 @@ for mode in modes:
     n = mode[0]
     
     # I have to get curves in function of frequency
-    freq = np.geomspace(1e6, 3e10, 501)
+    freq = np.geomspace(1e6, 3e10, 1001)
     
     # Initialize arrays
     k0 = np.zeros_like(freq)
@@ -73,3 +73,5 @@ for mode in modes:
     
 plt.show()
 
+
+# %%

@@ -67,7 +67,7 @@ for mode, f in zip(modes,f):
     fig.suptitle(f'abs TME TE{n}{m}, WR90 @{f/1e9} GHz', fontsize=16)
     # Show the plot
     plt.tight_layout()
-    plt.savefig(f"imgs/abs_TME_TE{n}{m}_WR90_{f/1e9}.png")
+    #plt.savefig(f"imgs/abs_TME_TE{n}{m}_WR90_{f/1e9}.png")
 
     # Plotting analytical results
     fig, ax = plt.subplots(2,3, figsize=(10, 5))
@@ -90,7 +90,7 @@ for mode, f in zip(modes,f):
     fig.suptitle(f'abs analytical TE{n}{m}, WR90 @{f/1e9} GHz', fontsize=16)
     # Show the plot
     plt.tight_layout()
-    plt.savefig(f"imgs/abs_analytical_TE{n}{m}_WR90_{f/1e9}.png")
+    #plt.savefig(f"imgs/abs_analytical_TE{n}{m}_WR90_{f/1e9}.png")
 
 # %% Doubt: when there exists a TM mode as well, since it turns on at the same 
 # cutoff frequency of the TE, should I consider them overlapped?
