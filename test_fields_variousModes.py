@@ -14,7 +14,7 @@ import scipy.constants as sc
 
 #%% Test Field distributions with analytical eq from textbook
 
-# We want to check a number of modes
+# We want to check a number of modes 
 modes = [[1,0], [2,0], [0,1], [1,1]]
 f = [10e9, 14e9, 15.5e9, 17e9]
 
