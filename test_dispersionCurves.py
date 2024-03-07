@@ -21,17 +21,17 @@ a=22.86e-3
 b=10.16e-3
 
 # We define a simple copper waveguide
-WR90 = anwg.Waveguide(a=a, b=b, zz=0, zt=0, sigma=58e6)
+WR90 = anwg.Waveguide(a=a, b=b, zz=2*1j, zt=-2*1j, sigma=58e6)
 
 # We want to check a number of modes
-modes = [[1,0], [2,0], [0,1], [1,1], [3,0], [2,1]]
+modes = [[1,0], [2,0], [0,1], [1,1], [2,1]]
 
 for mode in modes:
     m = mode[1]
     n = mode[0]
     
     # I have to get curves in function of frequency
-    freq = np.geomspace(1e6, 3e10, 501)
+    freq = np.geomspace(1e6, 3e10, 101)
     
     # Initialize arrays
     k0 = np.zeros_like(freq)
@@ -60,8 +60,8 @@ for mode in modes:
     eps_eff_a = (np.imag(gamma_a)/k0_a)**2
     
     # Plotting mode by mode
-    ax.plot(k0*a, eps_eff, marker = "s", markevery=10, label =f"TE{n}{m} Mode Theory")
-    ax.plot(k0_a*a, eps_eff_a, marker = "s", markevery=20, label =f"TE{n}{m} Analytical")
+    ax.plot(k0*a, eps_eff, marker = "s", markevery=5, label =f"TE{n}{m} Mode Theory")
+    ax.plot(k0_a*a, eps_eff_a, marker = "s", markevery=10, label =f"TE{n}{m} Analytical")
     
     ax.set_ylabel('$\epsilon_{eff}$')
     ax.set_xlabel('$k_0 a$')
@@ -72,6 +72,64 @@ for mode in modes:
     ax.legend()
     
 plt.show()
+
+# %% Plotting all the dispersion curves
+fig, ax = plt.subplots(nrows=4, ncols=4)
+
+# Geometrical dimension of the waveguide
+a=22.86e-3
+b=10.16e-3
+
+zz_list = [0, 1j/2, 1j, 2*1j]
+zt_list = [0, -1j/2, -1j, -2*1j]
+
+for i, zz in enumerate(zz_list):
+    # Loop through elements in zt_list
+    for j, zt in enumerate(zt_list):
+        
+        # We define a simple copper waveguide
+        WR90 = anwg.Waveguide(a=a, b=b, zz=zz, zt=zt, sigma=58e6)
+
+        # We want to check a number of modes
+        modes = [[1,0], [2,0], [0,1], [1,1], [2,1]]
+
+        for mode in modes:
+            m = mode[1]
+            n = mode[0]
+            
+            # I have to get curves in function of frequency
+            freq = np.geomspace(1e6, 3e10, 501)
+            
+            # Initialize arrays
+            k0 = np.zeros_like(freq)
+            kc = np.zeros_like(freq)
+            gamma = np.zeros_like(freq, dtype = complex)
+            eps_eff = np.zeros_like(freq)
+            
+            # Sweep on all frequency points
+            for idx, el in enumerate(freq):
+                dispCurveParams = anwg.DispersionCurve(WR90, m=m, n=n, freq=el)
+
+                k0[idx] = dispCurveParams.k0
+                kc[idx] = dispCurveParams.kc
+                gamma[idx] = dispCurveParams.gamma
+                eps_eff[idx] = dispCurveParams.eps_eff
+            
+        
+            # Plotting mode by mode
+            ax[i,j].plot(k0*a, eps_eff, marker = "s", markevery=5, label =f"TE{n}{m} Mode Theory")
+            
+            ax[i,j].set_ylabel('$\epsilon_{eff}$')
+            ax[i,j].set_xlabel('$k_0 a$')
+            
+            ax[i,j].set_ylim(0, 5)
+            ax[i,j].set_xlim(0, 7)
+            
+            ax[i,j].grid(True, color='gray', linestyle=':')
+            ax[i,j].legend()
+            
+        plt.show()
+
 
 
 # %%
